@@ -1,0 +1,9 @@
+.container{
+	width: 80%;
+	max-width: 500px;
+	height: 150px;
+	background-color: lightgreen; 
+	padding: 10px;
+	 margin: auto;
+	text-align: center;
+}
