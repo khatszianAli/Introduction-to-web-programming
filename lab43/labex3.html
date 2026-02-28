@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Fade Out Effect</title>
+</head>
+<body>
+    <p id="fadeText">This text will fade out...</p>
+    <button id="fadeButton">Fade Out</button>
+
+    <script>
+        let button = document.getElementById("fadeButton");
+        let text = document.getElementById("fadeText");
+
+        button.onclick = function() {
+            let opacity = 1;
+
+            function fade() {
+                if (opacity > 0) {
+                    opacity -= 0.1;
+                    text.style.opacity = opacity;
+                    setTimeout(fade, 100);
+                }
+            }
+
+            fade();
+        };
+    </script>
+</body>
+</html>

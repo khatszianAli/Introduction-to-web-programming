@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Blinking Text</title>
+
+</head>
+<body>
+    <p id="blinkText">This text will blink</p>
+
+    <script>
+        let text = document.getElementById("blinkText");
+        setInterval(() => {
+                text.style.color = text.style.color === "red" ? "blue" : "red";
+            }, 1000);
+    </script>
+</body>
+</html>

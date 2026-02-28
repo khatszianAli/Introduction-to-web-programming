@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+
+        #box {
+            width: 50px;
+            height: 50px;
+            background-color: red;
+            position: absolute;
+            top: 100px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            transition: left 0.05s linear;
+        }
+
+    </style>
+    <title>Moving Box</title>
+</head>
+<body>
+    <div id="box"></div>
+    <button id="moveButton">Move Right</button>
+
+    <script>
+        let box = document.getElementById("box");
+        let button = document.getElementById("moveButton");
+        let position = 0;
+
+        button.onclick = function() {
+          let  interval = setInterval(() => {
+
+                    if (position < 300) {
+                        position += 5;
+                        box.style.left = position + "px";
+                    } else {
+                        clearInterval(interval);
+
+                    }
+              
+            }, 50);
+        };
+    </script>
+</body>
+</html>
