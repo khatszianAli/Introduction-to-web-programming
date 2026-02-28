@@ -3,7 +3,7 @@ This repository contains laboratory works and projects for the course Introducti
 
 The Web Programming course introduces students to the fundamentals of designing and developing web applications, covering both front-end and back-end technologies. It begins with an overview of how the web works, including client-server architecture and HTTP/HTTPS protocols, before delving into front-end development with HTML, CSS, and JavaScript for building responsive and interactive user interfaces. Students will then explore back-end development, including server-side programming, databases, and RESTful APIs, to create dynamic and data-driven web applications. The course also emphasizes modern web development tools, version control with Git, and best practices for security and performance optimization. Through hands-on projects, students will gain practical experience in building full-stack web applications.
 
-#Learning Outcomes
+# Learning Outcomes
 
 -Understand core web technologies, including HTML, CSS, and JavaScript, for creating static and interactive web pages.
 -Design and implement server-side logic using languages like Python (Django/Flask), Node.js, or PHP, and manage server-client communication.
