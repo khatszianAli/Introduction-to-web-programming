@@ -17,7 +17,7 @@ The Web Programming course introduces students to the fundamentals of designing 
 ## Repository Structure
 ```
 Introduction-to-web-programming/
-├── lab02
+├── .idea
 ├── lab03
 ├── lab04
 ├── lab05
