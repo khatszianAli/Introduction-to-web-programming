@@ -1,0 +1,26 @@
+﻿@page "/add_tasks"
+@using System.Runtime.InteropServices.JavaScript
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations;
+
+@inject AppDbContext Db
+<div style="text-align: center; margin-top: 40px;">
+    <h2>Создать задачу</h2>
+    <p style="color: #64748b;">Заполните форму ниже, чтобы добавить новую запись</p>
+</div>
+<TaskForm Task="task" OnSaved="SaveTask"/>
+
+@code {
+
+    private TaskItem task = new TaskItem();
+    
+    private async System.Threading.Tasks.Task SaveTask()
+    {
+        Db.Tasks.Add(task);
+        await Db.SaveChangesAsync();
+        
+        task = new TaskItem();
+        StateHasChanged();
+    }
+
+}
