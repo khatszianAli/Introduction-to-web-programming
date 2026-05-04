@@ -1,0 +1,217 @@
+@page "/tasks/{Date:datetime}"
+@inject AppDbContext Db
+@using Microsoft.EntityFrameworkCore
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using TaskManager.Models
+@rendermode InteractiveServer
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<h2>Задачи на @Date.ToShortDateString()</h2>
+
+@if (tasks == null)
+{
+    <p>Loading...</p>
+}
+else if (!tasks.Any())
+{
+    <p>Нет задач на этот день</p>
+}
+else
+{
+    <div class="task-list">
+        @{
+            var personalTasks = tasks.Where(t => t.GroupId == null).ToList();
+            var groupedTasks = tasks.Where(t => t.GroupId != null).GroupBy(t => t.GroupId).ToList();
+        }
+
+        @foreach (var task in personalTasks)
+        {
+            <div class="task-card @(task.IsCompleted == true ? "completed" : "")">
+
+                <input type="checkbox"
+                       checked="@task.IsCompleted"
+                       @onchange="async () => await ToggleTask(task)"/>
+
+                <div class="task-content" @onclick="() => OpenModal(task)">
+                    <div class="task-title">@task.Name</div>
+                    <div class="task-desc">@task.Description</div>
+                    <div class="task-date">@task.Date.ToShortDateString()</div>
+                </div>
+
+            </div>
+        }
+
+        @foreach (var group in groupedTasks)
+        {
+            var firstTask = group.First();
+            var groupInfo = firstTask.Group;
+            <div class="task-card @(firstTask.IsCompleted == true ? "completed" : "")">
+
+                <input type="checkbox"
+                       checked="@firstTask.IsCompleted"
+                       @onchange="async () => await ToggleTask(firstTask)"/>
+
+                <div class="task-content" @onclick="() => OpenModal(firstTask)">
+                    <div class="task-title">@firstTask.Name</div>
+                    <div class="task-desc">@firstTask.Description</div>
+                    <div class="task-date">
+                        @firstTask.Date.ToShortDateString()
+                        <br/>
+                        <span style="color:#64748b; font-size: 0.9em;">Группа: @groupInfo?.Name</span>
+                    </div>
+                </div>
+
+            </div>
+            @if (group.Count() > 1)
+            {
+                <div style="margin-bottom: 15px; margin-top: -10px;">
+                    <NavLink href="@($"/groups/{group.Key}")" class="btn btn-sm btn-outline-secondary">
+                        Посмотреть все задачи (@group.Count()) в группе "@groupInfo?.Name"
+                    </NavLink>
+                </div>
+            }
+        }
+    </div>
+
+    @if (isOpen && selectedTask != null)
+    {
+        <div class="modal-backdrop" @onclick="CloseModal">
+
+            <div class="modal-content" @onclick:stopPropagation="true">
+
+                <button class="close-btn" @onclick="CloseModal">×</button>
+
+                <h3 class="modal-title">@selectedTask.Name</h3>
+
+                <div class="modal-status">
+                    <span class="status-badge @(selectedTask.IsCompleted ? "completed" : "pending")">
+                        @(selectedTask.IsCompleted ? "Выполнено" : "В процессе")
+                    </span>
+                    <span class="modal-date">@selectedTask.Date.ToShortDateString()</span>
+                </div>
+                <NavLink href="@($"/task-details/{selectedTask.Id}")" class="btn btn-sm btn-outline-primary" style="margin: 8px 0;">
+                    Детали задачи
+                </NavLink>
+                @if (isEditing)
+                {
+                    <TaskForm Task="selectedTask" OnSaved="UpdateTask" TaskNamePlaceholder="@selectedTask.Name" TaskDescriptionPlaceholder="@selectedTask.Description" TaskDate="@selectedTask.Date" FormName="SelectedDayEditTaskForm"/>
+                }
+                else
+                {
+                    <p class="modal-desc">
+                        @(string.IsNullOrWhiteSpace(selectedTask.Description) ? "Нет описания." : selectedTask.Description)
+                    </p>
+                    <button @onclick="() => isEditing = true" class="edit-btn">Редактировать</button>
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+   
+    [Parameter] 
+    public DateTime Date { get; set; }
+
+    private List<TaskItem> tasks;
+    private bool isOpen = false;
+    private TaskItem selectedTask = null;
+    private bool isEditing = false;
+    private int? currentUserId;
+    
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentUserId = await GetCurrentUserIdAsync();
+        await LoadTask();
+    }
+
+    private async Task LoadTask()
+    {
+        if (currentUserId is null)
+        {
+            tasks = new List<TaskItem>();
+            return;
+        }
+
+        tasks = await Db.Tasks
+            .Include(t => t.Group)
+            .Where(t => 
+                ((t.UserId == currentUserId.Value && t.GroupId == null) || 
+                 (t.GroupId != null && Db.GroupMembers.Any(m => m.GroupsId == t.GroupId && m.UsersId == currentUserId.Value))) &&
+                t.Date.Date == Date.Date)
+            .ToListAsync();
+    }
+    private async Task ToggleTask(TaskItem task)
+    {
+        if (currentUserId is null) return;
+
+        if (task.GroupId == null && task.UserId != currentUserId.Value) return;
+        if (task.GroupId != null && !await Db.GroupMembers.AnyAsync(m => m.GroupsId == task.GroupId && m.UsersId == currentUserId.Value)) return;
+
+        task.IsCompleted = !task.IsCompleted;
+        task.Status = task.IsCompleted ? TaskStatuses.Done : TaskStatuses.Todo;
+        await Db.SaveChangesAsync();
+    }
+    
+
+    private void OpenModal(TaskItem task)
+    {
+        selectedTask = task;
+        isOpen = true;
+        isEditing = false;
+    }
+
+    private void CloseModal()
+    {
+        isOpen = false;
+        selectedTask = null;
+        isEditing = false;
+    }
+    private async Task UpdateTask()
+    {
+        if (currentUserId is null || selectedTask is null)
+        {
+            CloseModal();
+            return;
+        }
+
+        if (selectedTask.GroupId == null && selectedTask.UserId != currentUserId.Value)
+        {
+            CloseModal();
+            return;
+        }
+        
+        if (selectedTask.GroupId != null && !await Db.GroupMembers.AnyAsync(m => m.GroupsId == selectedTask.GroupId && m.UsersId == currentUserId.Value))
+        {
+            CloseModal();
+            return;
+        }
+
+        Db.Update(selectedTask);
+        selectedTask.IsCompleted = selectedTask.Status == TaskStatuses.Done;
+        await Db.SaveChangesAsync();
+
+        isOpen = false;
+        isEditing = false;
+
+        await LoadTask();
+    }
+    
+    private async Task<int?> GetCurrentUserIdAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var username = authState.User.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            return null;
+        }
+
+        return await Db.Users
+            .Where(u => u.Username == username)
+            .Select(u => (int?)u.Id)
+            .FirstOrDefaultAsync();
+    }
+}

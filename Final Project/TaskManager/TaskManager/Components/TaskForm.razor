@@ -1,0 +1,54 @@
+@using System.Runtime.InteropServices.JavaScript
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.EntityFrameworkCore;
+@using TaskManager.Models
+@inject AppDbContext Db
+
+<EditForm class="task-form" Model="task" OnValidSubmit="SaveTask" FormName="@ResolvedFormName" method="post">
+    
+    <DataAnnotationsValidator />
+    
+    <InputText @bind-Value="task.Name" placeholder="@TaskNamePlaceholder" class="form-control"/>
+    <ValidationMessage For="@(() => task.Name)" />
+    
+    <InputTextArea @bind-Value="task.Description" placeholder="@TaskDescriptionPlaceholder" class="form-control"/>
+    <ValidationMessage For="@(() => task.Description)" />
+    
+    <InputDate @bind-Value="task.Date" class="form-control"/>
+    <ValidationMessage For="@(() => task.Date)" />
+    
+    <InputSelect @bind-Value="task.Status" class="form-control">
+        @foreach (var status in TaskStatuses.All)
+        {
+            <option value="@status">@status</option>
+        }
+    </InputSelect>
+    <button type="submit" class="btn btn-primary">@(IsEdit ? "Сохранить" : "Добавить")</button>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired]
+    public TaskItem task { get; set; } = new();
+    
+    [Parameter] 
+    public EventCallback OnSaved { get; set; }
+    
+    [Parameter]
+    public string? FormName { get; set; }
+
+    [Parameter] public string TaskNamePlaceholder { get; set; } = "Название задачи";
+    [Parameter] public string TaskDescriptionPlaceholder { get; set; } = "Опсиние задачи";
+    [Parameter] public DateTime TaskDate { get; set; }
+    
+    private readonly string generatedFormName = $"task-form-{Guid.NewGuid():N}";
+    private string ResolvedFormName => string.IsNullOrWhiteSpace(FormName) ? generatedFormName : FormName;
+    
+    private bool IsEdit => task.Id != 0;
+    private async Task SaveTask()
+    {
+        await OnSaved.InvokeAsync();
+    }
+    
+    
+}

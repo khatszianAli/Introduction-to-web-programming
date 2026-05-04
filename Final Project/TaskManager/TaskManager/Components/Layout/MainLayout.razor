@@ -1,0 +1,74 @@
+﻿@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@using TaskManager.Models
+@using TaskManager.Services
+@inject AppDbContext Db
+@inject CurrentUserService CurrentUserService
+@rendermode InteractiveServer
+
+<div class="page">
+    <div class="sidebar">
+        <h3 class="logo">TaskManager</h3>
+
+        <nav>
+            <NavLink href="/" class="nav-link"> Главная</NavLink>
+            <NavLink href="/add_tasks" class="nav-link"> Добавить задачу</NavLink>
+            <NavLink href="/calendar" class="nav-link"> Календарь</NavLink>
+            <NavLink href="/groups" class="nav-link"> Группы</NavLink>
+            @if (SidebarGroups.Any())
+            {
+                <div style="margin: 12px 0 6px 0; color: #cbd5e1; font-size: 0.85rem;">Мои группы</div>
+                @foreach (var group in SidebarGroups)
+                {
+                    <NavLink href="@($"/groups/{group.Id}")" class="nav-link" style="font-size: 0.92rem;">
+                        @group.Name
+                    </NavLink>
+                }
+            }
+            
+            <AuthorizeView Context="authState">
+                <NotAuthorized>
+                    <NavLink href="/register" class="nav-link"> Регистрация</NavLink>
+                </NotAuthorized>
+            </AuthorizeView>
+        </nav>
+    </div>
+
+    <main>
+        <div class="topbar">
+            <AuthorizeView Context="authState"> 
+                <Authorized>
+                    <span>Добро пожаловать, <strong>@authState.User.Identity?.Name</strong>!</span>
+                    <a href="/logout" class="btn btn-sm btn-outline-danger">Выйти</a>
+                </Authorized>
+                <NotAuthorized>
+                    <span>Вы вошли как Гость. <a href="/login">Войти</a></span>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    
+        <div class="content px-4">
+            @Body
+        </div>
+    </main>
+</div>
+
+@code {
+    private List<Group> SidebarGroups { get; set; } = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var currentUserId = await CurrentUserService.GetCurrentUserIdAsync();
+        if (currentUserId is null)
+        {
+            SidebarGroups = [];
+            return;
+        }
+
+        SidebarGroups = await Db.Groups
+            .Where(g => g.Members.Any(m => m.UsersId == currentUserId.Value))
+            .OrderBy(g => g.Name)
+            .ToListAsync();
+    }
+}

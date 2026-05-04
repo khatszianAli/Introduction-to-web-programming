@@ -1,0 +1,319 @@
+@page "/groups/{GroupId:int}"
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TaskManager.Models
+@using TaskManager.Services
+@inject AppDbContext Db
+@inject CurrentUserService CurrentUserService
+@inject NavigationManager Nav
+
+<h2>Группа</h2>
+
+@if (!string.IsNullOrWhiteSpace(ErrorMessage))
+{
+    <div class="alert alert-danger">@ErrorMessage</div>
+}
+
+@if (CurrentUserId is null)
+{
+    <p>Доступ только для авторизованных пользователей.</p>
+}
+else if (!IsMember)
+{
+    <p>Вы не состоите в этой группе.</p>
+}
+else if (Group is null)
+{
+    <p>Группа не найдена.</p>
+}
+else
+{
+    <div style="margin-bottom: 16px; display: flex; gap: 10px;">
+        <button class="btn @(showGroupInfo ? "btn-primary" : "btn-outline-primary")" @onclick="() => showGroupInfo = !showGroupInfo">
+            @(showGroupInfo ? "Скрыть информацию" : "Информация о группе")
+        </button>
+        <button class="btn @(showCreateTask ? "btn-primary" : "btn-outline-primary")" @onclick="() => showCreateTask = !showCreateTask">
+            @(showCreateTask ? "Отмена" : "Создать задачу")
+        </button>
+    </div>
+
+    @if (showGroupInfo)
+    {
+        <div class="task-form" style="margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <h3>@Group.Name</h3>
+                    <p>@Group.Description</p>
+                    <p style="color:#64748b">@($"@{Group.GroupUsername}") | ID группы: @Group.Id | Участников: @Group.Members.Count</p>
+                    
+                    <h4 style="margin-top: 18px;">Участники</h4>
+                    <ul>
+                        @foreach (var member in Group.Members.OrderBy(m => m.User?.Username))
+                        {
+                            <li>@member.User?.Username (@member.User?.Email)</li>
+                        }
+                    </ul>
+                </div>
+                <button class="btn btn-outline-danger group" @onclick="LeaveGroup">Выйти из группы</button>
+            </div>
+        </div>
+    }
+
+    @if (showCreateTask)
+    {
+        <div class="task-form" style="margin-bottom: 16px;">
+            <h4>Создать задачу в группе</h4>
+            <div class="form-group">
+                <InputText @bind-Value="NewTask.Name" class="form-control" placeholder="Название" />
+            </div>
+            <div class="form-group">
+                <InputTextArea @bind-Value="NewTask.Description" class="form-control" placeholder="Описание" />
+            </div>
+            <div class="form-group">
+                <InputDate @bind-Value="NewTask.Date" class="form-control" />
+            </div>
+            <div class="form-group">
+                <InputSelect @bind-Value="NewTask.Status" class="form-control">
+                    @foreach (var status in TaskStatuses.All)
+                    {
+                        <option value="@status">@status</option>
+                    }
+                </InputSelect>
+            </div>
+            <button class="btn btn-primary" @onclick="CreateTask">Создать задачу</button>
+        </div>
+    }
+
+    <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+        <h4 style="margin: 0;">Задачи группы на:</h4>
+        <input type="date" @bind="SelectedDate" class="form-control" style="width: auto;" />
+    </div>
+
+    @if (!FilteredTasks.Any())
+    {
+        <p>На выбранную дату нет задач.</p>
+    }
+    else
+    {
+        <div class="task-list">
+            @foreach (var task in FilteredTasks)
+            {
+                <div class="task-card @(task.IsCompleted == true ? "completed" : "")">
+                    
+                    <input type="checkbox" 
+                           checked="@task.IsCompleted"
+                           @onchange="async () => await ToggleTask(task)" />
+
+                    <div class="task-content" @onclick="() => OpenModal(task)">
+                        <div class="task-title">@task.Name</div>
+                        <div class="task-desc">@task.Description</div>
+                        <div class="task-date">
+                            Создал: @task.User?.Username | @task.CreatedAt.ToLocalTime().ToString("g") | Статус: @task.Status
+                        </div>
+                        <NavLink href="@($"/task-details/{task.Id}")" class="btn btn-sm btn-outline-primary" style="margin-top: 10px;" @onclick:stopPropagation="true">
+                            Открыть задачу
+                        </NavLink>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @if (isOpen && selectedTask != null)
+        {
+            <div class="modal-backdrop" @onclick="CloseModal">
+
+                <div class="modal-content" @onclick:stopPropagation="true">
+
+                    <button class="close-btn" @onclick="CloseModal">×</button>
+
+                    <h3 class="modal-title">@selectedTask.Name</h3>
+
+                    <div class="modal-status">
+                        <span class="status-badge @(selectedTask.IsCompleted ? "completed" : "pending")">
+                            @(selectedTask.IsCompleted ? "Выполнено" : "В процессе")
+                        </span>
+                        <span class="modal-date">@selectedTask.Date.ToShortDateString()</span>
+                    </div>
+                
+                    @if (isEditing)
+                    {
+                        <TaskForm Task="selectedTask" OnSaved="UpdateTask" TaskNamePlaceholder="@selectedTask.Name"
+                                  TaskDescriptionPlaceholder="@selectedTask.Description" TaskDate="@selectedTask.Date" FormName="GroupDetailsEditTaskForm"/>
+                    }
+                    else
+                    {
+                        <p class="modal-desc">
+                            @(string.IsNullOrWhiteSpace(selectedTask.Description) ? "Нет описания." : selectedTask.Description)
+                        </p>
+                        <button @onclick="() => isEditing = true" class="edit-btn">Редактировать</button>
+                        <NavLink href="@($"/task-details/{selectedTask.Id}")" class="btn btn-primary" style="margin: 8px 0;">
+                            Детали задачи
+                        </NavLink>
+                    }
+                </div>
+            </div>
+        }
+    }
+}
+
+@code {
+    [Parameter] public int GroupId { get; set; }
+
+    private int? CurrentUserId;
+    private bool IsMember;
+    private string? ErrorMessage;
+    private Group? Group;
+    private List<TaskItem> Tasks = new();
+    private TaskItem NewTask = new()
+    {
+        Date = DateTime.Today,
+        Status = TaskStatuses.Todo
+    };
+    
+    private bool isOpen = false;
+    private TaskItem? selectedTask = null;
+    private bool isEditing = false;
+    
+    private DateTime SelectedDate = DateTime.Today;
+    private bool showGroupInfo = false;
+    private bool showCreateTask = false;
+
+    private IEnumerable<TaskItem> FilteredTasks => Tasks.Where(t => t.Date.Date == SelectedDate.Date).OrderBy(t => t.Date);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        CurrentUserId = await CurrentUserService.GetCurrentUserIdAsync();
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        ErrorMessage = null;
+        Group = null;
+        Tasks = [];
+        IsMember = false;
+
+        if (CurrentUserId is null)
+        {
+            return;
+        }
+
+        IsMember = await Db.GroupMembers.AnyAsync(m =>
+            m.GroupsId == GroupId && m.UsersId == CurrentUserId.Value);
+        if (!IsMember)
+        {
+            return;
+        }
+
+        Group = await Db.Groups
+            .Include(g => g.Members)
+            .ThenInclude(m => m.User)
+            .FirstOrDefaultAsync(g => g.Id == GroupId);
+
+        if (Group is null)
+        {
+            return;
+        }
+
+        Tasks = await Db.Tasks
+            .Include(t => t.User)
+            .Where(t => t.GroupId == GroupId)
+            .OrderBy(t => t.Date)
+            .ToListAsync();
+    }
+
+    private async Task ToggleTask(TaskItem task)
+    {
+        if (CurrentUserId is null || !IsMember)
+        {
+            return;
+        }
+
+        task.IsCompleted = !task.IsCompleted;
+        task.Status = task.IsCompleted ? TaskStatuses.Done : TaskStatuses.Todo;
+        await Db.SaveChangesAsync();
+    }
+
+    private void OpenModal(TaskItem task)
+    {
+        selectedTask = task;
+        isOpen = true;
+        isEditing = false;
+    }
+
+    private void CloseModal()
+    {
+        isOpen = false;
+        selectedTask = null;
+        isEditing = false;
+    }
+
+    private async Task UpdateTask()
+    {
+        if (CurrentUserId is null || !IsMember || selectedTask is null)
+        {
+            CloseModal();
+            return;
+        }
+
+        Db.Update(selectedTask);
+        selectedTask.IsCompleted = selectedTask.Status == TaskStatuses.Done;
+        await Db.SaveChangesAsync();
+
+        isOpen = false;
+        isEditing = false;
+
+        await LoadData();
+    }
+
+    private async Task CreateTask()
+    {
+        ErrorMessage = null;
+        if (CurrentUserId is null)
+        {
+            ErrorMessage = "Требуется вход в систему.";
+            return;
+        }
+        if (!IsMember)
+        {
+            ErrorMessage = "Только участники группы могут создавать задачи.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(NewTask.Name) || string.IsNullOrWhiteSpace(NewTask.Description))
+        {
+            ErrorMessage = "Заполните название и описание задачи.";
+            return;
+        }
+
+        NewTask.UserId = CurrentUserId.Value;
+        NewTask.GroupId = GroupId;
+        NewTask.CreatedAt = DateTime.UtcNow;
+        NewTask.IsCompleted = NewTask.Status == TaskStatuses.Done;
+
+        Db.Tasks.Add(NewTask);
+        await Db.SaveChangesAsync();
+
+        NewTask = new TaskItem
+        {
+            Date = DateTime.Today,
+            Status = TaskStatuses.Todo
+        };
+
+        await LoadData();
+    }
+
+    private async Task LeaveGroup()
+    {
+        if (CurrentUserId is null || !IsMember) return;
+
+        var membership = await Db.GroupMembers
+            .FirstOrDefaultAsync(m => m.GroupsId == GroupId && m.UsersId == CurrentUserId.Value);
+
+        if (membership is not null)
+        {
+            Db.GroupMembers.Remove(membership);
+            await Db.SaveChangesAsync();
+            Nav.NavigateTo("/groups");
+        }
+    }
+}

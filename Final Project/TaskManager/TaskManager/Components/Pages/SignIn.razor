@@ -1,0 +1,45 @@
+@page "/login"
+@using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.AspNetCore.Antiforgery
+@inject NavigationManager Nav
+
+@attribute [RequireAntiforgeryToken(required: false)]
+
+<div style="text-align: center; margin-top: 40px;">
+    <h2>Вход в систему</h2>
+    <p style="color: #64748b;">Введите свои данные для доступа к задачам</p>
+</div>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-danger" style="color: red; text-align: center;">@ErrorMessage</div>
+}
+
+<form class="task-form" method="post" action="/auth/login" @formname="LoginForm">
+    <div class="form-group">
+        <label>Имя пользователя или Email</label>
+        <input name="login" class="form-control" required />
+    </div>
+
+    <div class="form-group">
+        <label>Пароль</label>
+        <input name="password" type="password" class="form-control" required />
+    </div>
+
+    <button type="submit" class="btn btn-success" style="margin-top: 10px;">Войти</button>
+</form>
+
+@code {
+    private string? ErrorMessage;
+    
+    protected override void OnInitialized()
+    {
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("error", out var errorCode) && errorCode == "invalid")
+        {
+            ErrorMessage = "Неверный логин или пароль!";
+        }
+    }
+}

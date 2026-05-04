@@ -1,0 +1,216 @@
+@page "/calendar"
+@attribute [StreamRendering]
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using TaskManager.Models
+@inject AppDbContext Db
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<div class="calendar-header">
+    <button type="button" class="btn-icon" @onclick="PrevMonth">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+    </button>
+
+    <h3 class="month-title">@currentMonth.ToString("MMMM yyyy")</h3>
+
+    <button type="button" class="btn-icon" @onclick="NextMonth">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+    </button>
+</div>
+<div class="calendar-grid">
+    @foreach (var day in GetDays())
+    {
+        <div class="calendar-day @(day.Date == DateTime.Today ? "today" : "")" @onclick="() => OpenDay(day)">
+            <div class="day-number">@day.Day</div>
+
+            @foreach (var task in GetTasksForDay(day).Take(2))
+            {
+                <div class="task-item @(task.IsCompleted ? "done" : "")" @onclick="()=> OpenModal(task)" @onclick:stopPropagation="true">
+                    @(task.GroupId != null ? $"[{task.Group?.Name}] " : "")@task.Name
+                </div>
+            }
+            @if (GetTasksForDay(day).Count() > 2)
+            {
+                var remainingCount = GetTasksForDay(day).Count() - 2;
+    
+                <div class="task-item more-indicator">
+                    ... (еще @remainingCount)
+                </div>
+            }
+            
+
+        </div>
+    }
+</div>
+@if (isOpen && selectedTask != null)
+{
+    
+    <div class="modal-backdrop" @onclick="CloseModal">
+        
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <input class = "calendar-chk @(selectedTask.IsCompleted == true ? "completed" : "")" type="checkbox" 
+                   checked="@selectedTask.IsCompleted"
+                   @onchange="async () => await ToggleTask(selectedTask)" />
+            
+            <button class="close-btn" @onclick="CloseModal">×</button>
+            
+            <h3 class="modal-title">@selectedTask.Name</h3>
+            
+            <div class="modal-status">
+                <span class="status-badge @(selectedTask.IsCompleted ? "completed" : "pending")">
+                    @(selectedTask.IsCompleted ? "Выполнено" : "В процессе")
+                </span>
+                <span class="modal-date">@selectedTask.Date.ToShortDateString()</span>
+            </div>
+            
+            
+            @if (isEditing)
+            {
+                <TaskForm Task="selectedTask" OnSaved="UpdateTask" TaskNamePlaceholder="@selectedTask.Name" TaskDescriptionPlaceholder="@selectedTask.Description" TaskDate="@selectedTask.Date" FormName="CalendarEditTaskForm"/>
+            }
+            else
+            {
+                <p class="modal-desc">
+                    @(string.IsNullOrWhiteSpace(selectedTask.Description) ? "Нет описания." : selectedTask.Description)
+                    
+                </p>
+                <button @onclick="() => isEditing = true" class="edit-btn">Редактировать</button>
+                <NavLink href="@($"/task-details/{selectedTask.Id}")" class="btn btn-primary" style="margin: 8px 0;">
+                    Детали задачи
+                </NavLink>
+            }
+            
+        </div>
+    </div>
+}
+@code {
+    private DateTime currentMonth = DateTime.Now;
+    private bool isEditing = false;
+    private int? currentUserId;
+
+    void PrevMonth()
+    {
+        currentMonth = currentMonth.AddMonths(-1);
+        StateHasChanged();
+    }
+
+    void NextMonth()
+    {
+        currentMonth = currentMonth.AddMonths(1);
+        StateHasChanged();
+    }
+
+    private List<TaskItem> tasks = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+       currentUserId = await GetCurrentUserIdAsync();
+       await LoadTask();
+    }
+    private async Task LoadTask()
+    {
+        if (currentUserId is null)
+        {
+            tasks = new List<TaskItem>();
+            return;
+        }
+
+        tasks = await Db.Tasks
+            .Include(t => t.Group)
+            .Where(t => 
+                (t.UserId == currentUserId.Value && t.GroupId == null) || 
+                (t.GroupId != null && Db.GroupMembers.Any(m => m.GroupsId == t.GroupId && m.UsersId == currentUserId.Value)))
+            .ToListAsync();
+    }
+
+    private IEnumerable<DateTime> GetDays()
+    {
+        var start = new DateTime(currentMonth.Year, currentMonth.Month, 1);
+        var days = DateTime.DaysInMonth(currentMonth.Year, currentMonth.Month);
+
+        return Enumerable.Range(0, days)
+            .Select(d => start.AddDays(d));
+    }
+
+    private IEnumerable<TaskItem> GetTasksForDay(DateTime day)
+    {
+        var dayTasks = tasks.Where(d => d.Date.Date == day.Date);
+        var personal = dayTasks.Where(t => t.GroupId == null);
+        var grouped = dayTasks.Where(t => t.GroupId != null).GroupBy(t => t.GroupId).Select(g => g.First());
+        
+        return personal.Concat(grouped);
+    }
+
+    private bool isOpen = false;
+    private TaskItem selectedTask = null;
+
+    private void OpenModal(TaskItem task)
+    {
+        selectedTask = task;
+        isOpen = true;
+        isEditing = false;
+    }
+
+    private void CloseModal()
+    {
+        isOpen = false;
+        selectedTask = null;
+        isEditing = false;
+    }
+    private async Task UpdateTask()
+    {
+        if (currentUserId is null || selectedTask is null || selectedTask.UserId != currentUserId.Value)
+        {
+            CloseModal();
+            return;
+        }
+
+        Db.Update(selectedTask);
+        selectedTask.IsCompleted = selectedTask.Status == TaskStatuses.Done;
+        await Db.SaveChangesAsync();
+
+        isOpen = false;
+        isEditing = false;
+
+        await LoadTask();
+    }
+    private async Task ToggleTask(TaskItem task)
+    {
+        if (currentUserId is null || task.UserId != currentUserId.Value)
+        {
+            return;
+        }
+
+        task.IsCompleted = !task.IsCompleted;
+        task.Status = task.IsCompleted ? TaskStatuses.Done : TaskStatuses.Todo;
+        await Db.SaveChangesAsync();
+    }
+    void OpenDay(DateTime day)
+    {
+        var formatted = day.ToString("yyyy-MM-dd");
+        Nav.NavigateTo($"/tasks/{formatted}");
+    }
+
+    private async Task<int?> GetCurrentUserIdAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var username = authState.User.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            return null;
+        }
+
+        return await Db.Users
+            .Where(u => u.Username == username)
+            .Select(u => (int?)u.Id)
+            .FirstOrDefaultAsync();
+    }
+}

@@ -1,0 +1,258 @@
+@page "/task-details/{TaskId:int}"
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TaskManager.Models
+@using TaskManager.Services
+@inject AppDbContext Db
+@inject CurrentUserService CurrentUserService
+
+<h2>Детали задачи</h2>
+
+@if (!string.IsNullOrWhiteSpace(ErrorMessage))
+{
+    <div class="alert alert-danger">@ErrorMessage</div>
+}
+
+@if (Task is null)
+{
+    <p>Задача не найдена или у вас нет доступа.</p>
+}
+else
+{
+    <div class="task-form detail" style="margin-bottom: 16px;">
+        <h3>@Task.Name</h3>
+        <p>@Task.Description</p>
+        <p style="color:#64748b">
+            Автор: @Task.User?.Username |
+            Создано: @Task.CreatedAt.ToLocalTime().ToString("g") |
+            Статус: @Task.Status |
+            Тип: @(Task.GroupId is null ? "Личная задача" : "Задача группы")
+        </p>
+    </div>
+
+    @if (CanComment)
+    {
+        
+
+        <h4>Комментарии</h4>
+        <div class="task-form comment" style="margin-bottom: 16px;">
+    <h4>Добавить комментарий</h4>
+    <textarea @bind="NewCommentText" class="form-control" placeholder="Комментарий..." rows="3"></textarea>
+    <button class="btn btn-primary" style="margin-top: 10px;" @onclick="AddRootComment">Отправить</button>
+    </div>
+        @if (!DisplayComments.Any())
+        {
+            <p>Пока комментариев нет.</p>
+        }
+        else
+        {
+            
+            @foreach (var node in DisplayComments)
+            {
+                var comment = node.Comment;
+                <div class="task-card" style="margin-left:@(node.Depth * 24)px; margin-bottom: 10px;">
+                    <div class="task-content">
+                        <div class="task-date">
+                            @comment.User?.Username · @comment.CreatedAt.ToLocalTime().ToString("g")
+                        </div>
+                        <div class="task-desc">@comment.Content</div>
+
+                        <div style="margin-top: 8px;">
+                            @foreach (var emoji in Reactions)
+                            {
+                                var count = comment.Reactions.Count(r => r.Emoji == emoji);
+                                <button class="btn btn-sm btn-outline-secondary"
+                                        style="margin-right: 6px;"
+                                        @onclick="() => ToggleReaction(comment.Id, emoji)">
+                                    @emoji @count
+                                </button>
+                            }
+                        </div>
+
+                        <div style="margin-top: 8px;">
+                            <input type="text" @bind="ReplyDrafts[comment.Id]" class="form-control" placeholder="Ответить..." />
+                            <button class="btn btn-sm btn-primary" style="margin-top: 8px;" @onclick="() => AddReply(comment.Id)">
+                                Ответить
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    }
+    else
+    {
+        <p>Комментарии доступны только для задач группы и только участникам этой группы.</p>
+    }
+}
+
+@code {
+    [Parameter] public int TaskId { get; set; }
+
+    private TaskItem? Task;
+    private int? CurrentUserId;
+    private bool CanComment;
+    private string? ErrorMessage;
+    private string NewCommentText = string.Empty;
+    private List<TaskComment> Comments = new();
+    private List<CommentNode> DisplayComments = new();
+    private Dictionary<int, string> ReplyDrafts = new();
+    private static readonly string[] Reactions = ["👍", "👎", "❤️", "🎉"];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        CurrentUserId = await CurrentUserService.GetCurrentUserIdAsync();
+        await LoadTaskData();
+    }
+
+    private async Task LoadTaskData()
+    {
+        ErrorMessage = null;
+        var tempTask = await Db.Tasks
+            .Include(t => t.User)
+            .FirstOrDefaultAsync(t => t.Id == TaskId);
+
+        if (tempTask is null)
+        {
+            return;
+        }
+
+        if (CurrentUserId is null)
+        {
+            return;
+        }
+
+        var hasAccess = await HasAccessToTask(tempTask, CurrentUserId.Value);
+        
+        if (!hasAccess)
+        {
+            return;
+        }
+        
+        Task = tempTask;
+
+        CanComment = Task.GroupId is not null &&
+            await Db.GroupMembers.AnyAsync(m => m.GroupsId == Task.GroupId.Value && m.UsersId == CurrentUserId.Value);
+
+        await LoadComments();
+    }
+
+    private async Task<bool> HasAccessToTask(TaskItem task, int currentUserId)
+    {
+        if (task.GroupId is null)
+        {
+            return task.UserId == currentUserId;
+        }
+
+        return await Db.GroupMembers.AnyAsync(m => m.GroupsId == task.GroupId.Value && m.UsersId == currentUserId);
+    }
+
+    private async Task LoadComments()
+    {
+        Comments = [];
+        DisplayComments = [];
+        ReplyDrafts = new Dictionary<int, string>();
+
+        if (Task is null || !CanComment)
+        {
+            return;
+        }
+
+        Comments = await Db.TaskComments
+            .Include(c => c.User)
+            .Include(c => c.Reactions)
+            .Where(c => c.TaskItemId == Task.Id)
+            .OrderBy(c => c.CreatedAt)
+            .ToListAsync();
+
+        var childrenMap = Comments.ToLookup(c => c.ParentCommentId);
+
+        void AppendChildren(int? parentId, int depth)
+        {
+            foreach (var child in childrenMap[parentId])
+            {
+                DisplayComments.Add(new CommentNode(child, depth));
+                ReplyDrafts.TryAdd(child.Id, string.Empty);
+                AppendChildren(child.Id, depth + 1);
+            }
+        }
+
+        AppendChildren(null, 0);
+    }
+
+    private async Task AddRootComment()
+    {
+        await AddCommentInternal(null, NewCommentText);
+        NewCommentText = string.Empty;
+    }
+
+    private async Task AddReply(int parentCommentId)
+    {
+        if (!ReplyDrafts.TryGetValue(parentCommentId, out var replyText))
+        {
+            return;
+        }
+
+        await AddCommentInternal(parentCommentId, replyText);
+        ReplyDrafts[parentCommentId] = string.Empty;
+    }
+
+    private async Task AddCommentInternal(int? parentCommentId, string content)
+    {
+        ErrorMessage = null;
+        if (Task is null || CurrentUserId is null || !CanComment)
+        {
+            ErrorMessage = "Недостаточно прав для комментирования.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return;
+        }
+
+        Db.TaskComments.Add(new TaskComment
+        {
+            TaskItemId = Task.Id,
+            UserId = CurrentUserId.Value,
+            ParentCommentId = parentCommentId,
+            Content = content.Trim(),
+            CreatedAt = DateTime.UtcNow
+        });
+        await Db.SaveChangesAsync();
+        await LoadComments();
+    }
+
+    private async Task ToggleReaction(int commentId, string emoji)
+    {
+        ErrorMessage = null;
+        if (CurrentUserId is null || !CanComment)
+        {
+            return;
+        }
+
+        var existing = await Db.CommentReactions.FirstOrDefaultAsync(r =>
+            r.TaskCommentId == commentId &&
+            r.UserId == CurrentUserId.Value &&
+            r.Emoji == emoji);
+
+        if (existing is null)
+        {
+            Db.CommentReactions.Add(new CommentReaction
+            {
+                TaskCommentId = commentId,
+                UserId = CurrentUserId.Value,
+                Emoji = emoji,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+        else
+        {
+            Db.CommentReactions.Remove(existing);
+        }
+
+        await Db.SaveChangesAsync();
+        await LoadComments();
+    }
+
+    private sealed record CommentNode(TaskComment Comment, int Depth);
+}

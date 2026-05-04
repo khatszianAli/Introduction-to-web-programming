@@ -1,0 +1,634 @@
+/* --- Глобальные переменные для легкой настройки --- */
+:root {
+    --primary: #6366f1; /* Современный Indigo */
+    --primary-hover: #4f46e5;
+    --bg-main: #f8fafc;
+    --bg-sidebar: #0f172a;
+    --border-color: #e2e8f0;
+    --text-main: #1e293b;
+    --text-muted: #64748b;
+    --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --radius: 12px;
+    --spacing: 24px; /* Default large spacing - увеличен */
+    --small-spacing: 12px;
+}
+
+html, body {
+    font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    line-height: 1.6; /* Улучшенная читаемость */
+}
+
+/* --- Layout --- */
+.page {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.sidebar {
+    width: 260px;
+    background: var(--bg-sidebar);
+    color: white;
+    padding: var(--spacing); /* Увеличен отступ */
+    display: flex;
+    flex-direction: column;
+    box-shadow: 4px 0 10px rgba(0,0,0,0.05);
+}
+
+.logo {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin-bottom: 40px;
+    background: linear-gradient(to right, #818cf8, #c084fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    color: #94a3b8;
+    padding: 12px 16px; /* Увеличен отступ */
+    margin-bottom: 8px; /* Увеличен отступ */
+    border-radius: var(--radius);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.nav-link:hover {
+    background: rgba(255,255,255,0.05);
+    color: white;
+}
+
+.nav-link.active {
+    background: var(--primary);
+    color: white;
+}
+
+/* --- Main Content --- */
+main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.topbar {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(8px);
+    padding: 16px var(--spacing);
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.content {
+    padding: var(--spacing); /* Увеличен отступ контента */
+    max-width: 1200px;
+}
+
+/* --- Task List --- */
+.task-list {
+    margin-top: var(--spacing);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing); /* Увеличен отступ между карточками */
+}
+
+.task-card {
+    background: white;
+    padding: var(--spacing); /* Увеличен внутренний отступ */
+    border-radius: 16px;
+    border: 1px solid #f1f5f9;
+    box-shadow: var(--card-shadow);
+    display: flex;
+    gap: var(--small-spacing); /* Отступ между чекбоксом и текстом */
+    align-items: flex-start; /* Выравнивание чекбокса по верху */
+    transition: transform 0.2s ease;
+}
+
+.task-card:hover {
+    transform: translateY(-4px);
+}
+
+.task-card input[type="checkbox"], .calendar-chk {
+    appearance: none; /* Кастомный чекбокс */
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--text-muted);
+    border-radius: 4px;
+    margin-top: 4px; /* Выравнивание с верхом заголовка */
+    cursor: pointer;
+    accent-color: var(--primary); /* Современный акцент */
+}
+
+.task-card input[type="checkbox"]:checked, .calendar-chk:checked {
+    background-color: var(--primary);
+    border-color: var(--primary);
+    position: relative;
+}
+
+.task-card input[type="checkbox"]:checked::after, .calendar-chk:checked::after {
+    content: '✓';
+    position: absolute;
+    color: white;
+    font-size: 14px;
+    left: 4px;
+    top: -1px;
+}
+
+.task-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: 4px;
+    cursor: pointer;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;        
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: normal;
+}
+
+.task-title {
+    font-size: 1.1rem; /* Чуть крупнее заголовок */
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.task-desc {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.task-date {
+    background: #f1f5f9;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-top: 4px; /* Улучшенное выравнивание даты */
+}
+
+/* --- Form --- */
+/* --- Стили для центрирования формы --- */
+.task-form {
+    max-width: 500px;          /* Ограничиваем ширину */
+    width: 100%;               /* Занимает всю ширину на мобилках */
+    margin: 30px auto;         /* margin: auto центрирует форму по горизонтали! 60px - отступ сверху */
+    background: white;         /* Белый фон, чтобы форма выделялась */
+    padding: 32px;             /* Внутренние отступы */
+    border-radius: 16px;       /* Скругление углов */
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03); /* Очень мягкая тень */
+    border: 1px solid var(--border-color);      /* Легкая обводка */
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing);       /* Расстояние между полями ввода */
+}
+.task-form.comment {
+    max-width: 100%;
+}
+.task-form.detail {
+    max-width: 100%;
+}
+.form-control {
+    padding: 14px 60px; /* Крупнее контролы формы */
+    border-radius: var(--radius);
+    border: 1px solid var(--border-color);
+    background: white;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-control:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+    outline: none;
+}
+
+.form-control::placeholder {
+    color: #cbd5e1;
+}
+
+.btn-primary {
+    background-color: var(--primary);
+    border: none;
+    padding: 14px 28px; /* Крупнее кнопка */
+    border-radius: var(--radius);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-hover);
+}
+
+/* --- States --- */
+.completed {
+    opacity: 0.5;
+    filter: grayscale(1);
+}
+
+.completed .task-title {
+    text-decoration: line-through;
+}
+
+.invalid {
+    border-color: #ef4444;
+}
+
+.validation-message {
+    color: #ef4444;
+    font-size: 12px;
+    margin-top: 4px;
+}
+/* --- Календарь --- */
+.calendar-grid {
+    cursor: pointer;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 16px;
+    margin-top: 20px;
+}
+
+.calendar-day {
+    background: white;
+    border-radius: var(--radius);
+    padding: 16px;
+    min-height: 140px;
+    border: 1px solid #f1f5f9;
+    box-shadow: var(--card-shadow);
+    transition: transform 0.2s ease;
+}
+
+.calendar-day:hover {
+    transform: translateY(-4px);
+}
+
+.day-number {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 12px;
+}
+
+.today {
+    background: #eef2ff;
+    border: 2px solid var(--primary);
+}
+
+.task-item {
+    background: var(--primary);
+    color: white;
+    padding: 6px 10px;
+    margin-top: 6px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
+    cursor: pointer; 
+    transition: transform 0.1s ease, filter 0.2s ease;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;        /* Количество строк перед обрезкой */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: normal;
+}
+
+.task-item:hover {
+    filter: brightness(1.1); 
+}
+
+/* --- Стили Модального окна --- */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100%;
+    background: rgba(15, 23, 42, 0.4); /* Полупрозрачный темный фон */
+    backdrop-filter: blur(4px);        /* Эффект размытия заднего фона */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;                     /* Поверх всего сайта */
+}
+
+.modal-content {
+    background: white;
+    padding: 32px;
+    border-radius: 20px;
+    width: 90%;
+    max-width: 600px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    position: relative;
+    animation: modalFadeIn 0.2s ease-out forwards;
+}
+
+/* Кнопка закрытия (Крестик) */
+.close-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background 0.2s, color 0.2s;
+}
+
+.close-btn:hover {
+    background: #f1f5f9;
+    color: #ef4444; /* Красный при наведении */
+}
+
+/* Типографика внутри окна */
+.modal-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin: 0 0 16px 0;
+    padding-right: 24px; /* Чтобы текст не налезал на крестик */
+}
+
+.modal-status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.modal-date {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.status-badge {
+    font-size: 0.8rem;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+.status-badge.completed {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-badge.pending {
+    background: #f1f5f9;
+    color: var(--text-muted);
+}
+
+.modal-desc {
+    color: #334155;
+    line-height: 1.6;
+    margin: 0;
+    white-space: pre-wrap; /* Сохраняет переносы строк из textarea */
+}
+
+/* Анимация плавного появления */
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+/* --- Формы и кнопки --- */
+.btn-primary {
+    background-color: var(--primary);
+    border: none;
+    padding: 12px 24px;
+    border-radius: var(--radius);
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-hover);
+}
+
+.form-control {
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    border: 1px solid #e2e8f0;
+    background: white;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-control:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+    outline: none;
+}
+
+/* --- Карточки задач --- */
+.task-card {
+    background: white;
+    padding: 20px;
+    border-radius: 16px;
+    border: 1px solid #f1f5f9;
+    box-shadow: var(--card-shadow);
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.task-title {
+    font-size: 1rem;
+    color: var(--text-main);
+    margin-bottom: 4px;
+}
+
+.task-desc {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.task-date {
+    background: #f1f5f9;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+/* --- Состояния --- */
+.completed {
+    opacity: 0.5;
+    filter: grayscale(1);
+}
+
+.completed .task-title {
+    text-decoration: line-through;
+}
+
+.task-item.done {
+    background: #cbd5e1;
+    color: #64748b;
+    box-shadow: none;
+}
+
+.invalid {
+    border-color: #ef4444;
+}
+
+.validation-message {
+    color: #ef4444;
+    font-size: 12px;
+    margin-top: 4px;
+}
+/* --- Центрирование всего контента на странице --- */
+.content {
+    padding: var(--spacing);
+    max-width: 1200px;  /* Ограничиваем максимальную ширину */
+    width: 100%;        /* Занимаем всю доступную ширину до 1200px */
+    margin: 0 auto;     /* МАГИЯ ЗДЕСЬ: Автоматические отступы по бокам для центрирования */
+}
+
+/* --- Стили шапки календаря --- */
+.calendar-header {
+    display: flex;
+    justify-content: space-between; /* Раскидывает элементы по краям (Кнопка - Текст - Кнопка) */
+    align-items: center;            /* Выравнивает элементы по вертикали по центру */
+    width: 100%;                    /* Занимает всю ширину родителя */
+    margin-bottom: 24px;
+    padding: 12px 24px;             /* Немного "воздуха" внутри шапки */
+    background: white;              /* Белый фон, чтобы выделить шапку */
+    border-radius: 16px;            /* Скругленные углы, как у карточек */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02); /* Очень легкая тень для объема */
+}
+
+/* --- Заголовок --- */
+.month-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0;
+    text-transform: capitalize; /* Делает первую букву заглавной */
+}
+
+/* --- Красивые круглые кнопки-стрелки --- */
+.btn-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 50%; /* Делает кнопку идеально круглой */
+    color: #64748b;     /* Цвет иконки */
+    cursor: pointer;
+    transition: all 0.2s ease; /* Плавная анимация при наведении */
+}
+
+.btn-icon:hover {
+    background: #f8fafc;
+    border-color: #6366f1; /* Цвет индиго при наведении */
+    color: #6366f1;
+    transform: scale(1.05); /* Легкий эффект увеличения */
+    box-shadow: 0 4px 6px rgba(99, 102, 241, 0.15); /* Цветная тень при наведении */
+}
+
+/* Убираем стандартный outline при клике, заменяем на красивое свечение */
+.btn-icon:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.calendar-actions {
+    display: flex;
+    gap: 8px; /* Расстояние между кнопками */
+}
+
+/* Круглые кнопки навигации */
+.btn-icon {
+    background: white;
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%; /* Делает кнопку идеально круглой */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.2rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    transition: all 0.2s ease;
+}
+
+.btn-icon:hover {
+    background: var(--bg-main);
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: translateY(-2px); /* Легкий эффект поднятия при наведении */
+}
+.validation-message {
+    color: red;
+    font-size: 12px;
+}
+.edit-btn {
+    margin-top: -20px;
+    margin-left: 65%;
+    position: absolute;
+    width: 130px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+
+    border: none;
+    border-radius: 10px;
+
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+
+    cursor: pointer;
+    transition: all 0.25s ease;
+
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+}
+
+.edit-btn:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+}
+
+.edit-btn:active {
+    transform: scale(0.97);
+}
+.btn-outline-danger{
+    position: absolute;
+    text-decoration: none;
+    border-radius: 20px;
+    margin-left: 70%;
+}
+.btn-outline-danger.group{
+    position: relative;
+    width: 250px;
+    margin-left: 20%;
+}

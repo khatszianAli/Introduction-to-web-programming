@@ -1,0 +1,21 @@
+@page "/db-debug"
+@inject AppDbContext Db
+@using Microsoft.EntityFrameworkCore
+@using TaskManager.Models
+
+<h3>DB Tasks Debug</h3>
+<ul>
+    @foreach (var task in tasks)
+    {
+        <li>ID: @task.Id, Name: @task.Name, UserId: @task.UserId, GroupId: @(task.GroupId?.ToString() ?? "NULL")</li>
+    }
+</ul>
+
+@code {
+    private List<TaskItem> tasks = new();
+    
+    protected override async Task OnInitializedAsync()
+    {
+        tasks = await Db.Tasks.ToListAsync();
+    }
+}

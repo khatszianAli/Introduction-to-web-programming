@@ -1,0 +1,91 @@
+﻿@page "/add_tasks"
+@using System.Runtime.InteropServices.JavaScript
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations;
+@using Microsoft.EntityFrameworkCore
+@using System.Security.Claims
+@using TaskManager.Models
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Antiforgery
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject AppDbContext Db
+@inject AuthenticationStateProvider AuthenticationStateProvider
+<div style="text-align: center; margin-top: 40px;">
+    <h2>Создать задачу</h2>
+    <p style="color: #64748b;">Заполните форму ниже, чтобы добавить новую запись</p>
+</div>
+@attribute [RequireAntiforgeryToken(required: false)]
+
+@if (!string.IsNullOrWhiteSpace(ErrorMessage))
+{
+    <div class="alert alert-danger" style="color: red; text-align: center; margin-bottom: 15px;">
+        @ErrorMessage
+    </div>
+}
+
+<EditForm class="task-form" Model="task" OnValidSubmit="SaveTask" FormName="AddTaskForm" method="post">
+    <DataAnnotationsValidator />
+
+    <InputText @bind-Value="task.Name" placeholder="Название задачи" class="form-control" />
+    <ValidationMessage For="@(() => task.Name)" />
+
+    <InputTextArea @bind-Value="task.Description" placeholder="Описание задачи" class="form-control" />
+    <ValidationMessage For="@(() => task.Description)" />
+
+    <InputDate @bind-Value="task.Date" class="form-control" />
+    <ValidationMessage For="@(() => task.Date)" />
+    
+    <InputSelect @bind-Value="task.Status" class="form-control">
+        @foreach (var status in TaskStatuses.All)
+        {
+            <option value="@status">@status</option>
+        }
+    </InputSelect>
+
+    <button type="submit" class="btn btn-primary">Добавить</button>
+</EditForm>
+
+@code {
+
+    [SupplyParameterFromForm(FormName = "AddTaskForm")]
+    private TaskItem task { get; set; } = new();
+    private string? ErrorMessage;
+    
+    private async System.Threading.Tasks.Task SaveTask()
+    {
+        ErrorMessage = null;
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var principal = authState.User;
+        var username = principal.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            ErrorMessage = "Сессия истекла. Пожалуйста, войдите заново.";
+            return;
+        }
+
+        var userId = await Db.Users
+            .Where(u => u.Username == username)
+            .Select(u => (int?)u.Id)
+            .FirstOrDefaultAsync();
+
+        if (userId is null)
+        {
+            ErrorMessage = "Пользователь не найден. Пожалуйста, войдите заново.";
+            return;
+        }
+
+        task.UserId = userId.Value;
+        task.GroupId = null;
+        task.IsCompleted = task.Status == TaskStatuses.Done;
+        Db.Tasks.Add(task);
+        await Db.SaveChangesAsync();
+        
+        task = new TaskItem { Date = DateTime.Today, Status = TaskStatuses.Todo };
+        StateHasChanged();
+    }
+
+}

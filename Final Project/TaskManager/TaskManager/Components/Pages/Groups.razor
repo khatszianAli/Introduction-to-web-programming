@@ -1,0 +1,207 @@
+@page "/groups"
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using TaskManager.Models
+@using TaskManager.Services
+@inject AppDbContext Db
+@inject CurrentUserService CurrentUserService
+@inject NavigationManager Nav
+
+<h2>Группы</h2>
+
+@if (!string.IsNullOrWhiteSpace(ErrorMessage))
+{
+    <div class="alert alert-danger">@ErrorMessage</div>
+}
+
+@if (CurrentUserId is null)
+{
+    <p>Чтобы работать с группами, пожалуйста, <a href="/login">войдите</a>.</p>
+}
+else
+{
+    <div class="task-form" style="margin-bottom: 20px;">
+        <h4>Создать группу</h4>
+        <div class="form-group">
+            <InputText @bind-Value="NewGroupName" class="form-control" placeholder="Название группы" />
+        </div>
+        <div class="form-group">
+            <InputText @bind-Value="NewGroupUsername" class="form-control" placeholder="Group username (уникальный, например team_alpha)" />
+        </div>
+        <div class="form-group">
+            <InputTextArea @bind-Value="NewGroupDescription" class="form-control" placeholder="Описание (опционально)" />
+        </div>
+        <button class="btn btn-primary" @onclick="CreateGroup">Создать</button>
+    </div>
+
+    <div class="task-form" style="margin-bottom: 20px;">
+        <h4>Вступить в группу по group username</h4>
+        <div class="form-group">
+            <InputText @bind-Value="JoinGroupUsername" class="form-control" placeholder="group username" />
+        </div>
+        <button class="btn btn-outline-primary" @onclick="JoinGroup">Вступить</button>
+    </div>
+
+    <h4>Мои группы</h4>
+    @if (!MyGroups.Any())
+    {
+        <p>Вы пока не состоите ни в одной группе.</p>
+    }
+    else
+    {
+        <div class="task-list">
+            @foreach (var group in MyGroups)
+            {   <NavLink href="@($"/groups/{group.Id}")"  style="gap: 10px; text-decoration: none;">
+                <div class="task-card" style="margin-bottom: 0;">
+                    <div class="task-content">
+                        <div class="task-title">@group.Name</div>
+                        <div class="task-desc">@group.Description</div>
+                        <div class="task-date">
+                            @($"@{group.GroupUsername}") | Создатель: @group.CreatedByUser?.Username | Участников: @group.Members.Count
+                        </div>
+                        
+                            
+                        
+                    </div>
+                </div>
+                </NavLink>
+            }
+        </div>
+    }
+}
+
+@code {
+    private int? CurrentUserId;
+    private string? ErrorMessage;
+    private string NewGroupName { get; set; } = string.Empty;
+    private string NewGroupUsername { get; set; } = string.Empty;
+    private string NewGroupDescription { get; set; } = string.Empty;
+    private string JoinGroupUsername { get; set; } = string.Empty;
+    private List<Group> MyGroups { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        CurrentUserId = await CurrentUserService.GetCurrentUserIdAsync();
+        await LoadGroups();
+    }
+
+    private async Task LoadGroups()
+    {
+        if (CurrentUserId is null)
+        {
+            MyGroups = [];
+            return;
+        }
+
+        MyGroups = await Db.Groups
+            .Include(g => g.Members)
+            .Include(g => g.CreatedByUser)
+            .Where(g => g.Members.Any(m => m.UsersId == CurrentUserId.Value))
+            .OrderBy(g => g.Name)
+            .ToListAsync();
+    }
+
+    private async Task CreateGroup()
+    {
+        if (CurrentUserId is null)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        ErrorMessage = null;
+        if (string.IsNullOrWhiteSpace(NewGroupName))
+        {
+            ErrorMessage = "Название группы обязательно.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(NewGroupUsername))
+        {
+            ErrorMessage = "Group username обязателен.";
+            return;
+        }
+
+        var normalizedGroupUsername = NewGroupUsername.Trim().ToLowerInvariant();
+        var isValidGroupUsername = normalizedGroupUsername.All(c => char.IsLetterOrDigit(c) || c == '_' || c == '-');
+        if (!isValidGroupUsername)
+        {
+            ErrorMessage = "Group username может содержать только буквы, цифры, '_' и '-'.";
+            return;
+        }
+        var usernameTaken = await Db.Groups.AnyAsync(g => g.GroupUsername == normalizedGroupUsername);
+        if (usernameTaken)
+        {
+            ErrorMessage = "Такой group username уже занят.";
+            return;
+        }
+
+        var group = new Group
+        {
+            Name = NewGroupName.Trim(),
+            GroupUsername = normalizedGroupUsername,
+            Description = NewGroupDescription.Trim(),
+            CreatedByUserId = CurrentUserId,
+            CreatedAt = DateTime.UtcNow
+        };
+        Db.Groups.Add(group);
+        await Db.SaveChangesAsync();
+
+        Db.GroupMembers.Add(new GroupMember
+        {
+            GroupsId = group.Id,
+            UsersId = CurrentUserId.Value
+        });
+        await Db.SaveChangesAsync();
+
+        NewGroupName = string.Empty;
+        NewGroupUsername = string.Empty;
+        NewGroupDescription = string.Empty;
+        await LoadGroups();
+    }
+
+    private async Task JoinGroup()
+    {
+        if (CurrentUserId is null)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        ErrorMessage = null;
+        if (string.IsNullOrWhiteSpace(JoinGroupUsername))
+        {
+            ErrorMessage = "Введите group username.";
+            return;
+        }
+
+        var normalizedGroupUsername = JoinGroupUsername.Trim().ToLowerInvariant();
+        var groupToJoin = await Db.Groups
+            .Include(g => g.CreatedByUser)
+            .FirstOrDefaultAsync(g => g.GroupUsername == normalizedGroupUsername);
+        if (groupToJoin is null)
+        {
+            ErrorMessage = "Группа с таким group username не найдена.";
+            return;
+        }
+        
+
+
+        var membershipExists = await Db.GroupMembers.AnyAsync(m =>
+            m.GroupsId == groupToJoin.Id && m.UsersId == CurrentUserId.Value);
+        if (membershipExists)
+        {
+            ErrorMessage = "Вы уже состоите в этой группе.";
+            return;
+        }
+
+        Db.GroupMembers.Add(new GroupMember
+        {
+            GroupsId = groupToJoin.Id,
+            UsersId = CurrentUserId.Value
+        });
+        await Db.SaveChangesAsync();
+
+        JoinGroupUsername = string.Empty;
+        await LoadGroups();
+    }
+}
