@@ -2,7 +2,7 @@
 
 A full-featured collaborative task management web application built with **ASP.NET Core Blazor** and **SQL Server**. TaskManager enables users to create, manage, and organize tasks individually or within collaborative groups with real-time commenting and emoji reactions.
 
-## 🌟 Features
+## Features
 
 ### Core Task Management
 - **Create, Read, Update, Delete (CRUD)** tasks with full task lifecycle management
@@ -14,8 +14,7 @@ A full-featured collaborative task management web application built with **ASP.N
 ### Collaboration Features
 - **Group Management**: Create and manage collaborative task groups
 - **Group Members**: Add members to groups for shared task management
-- **Task Comments**: Comment on tasks with nested reply support
-- **Emoji Reactions**: React to comments with emoji (👍, ❤️, 😂, etc.)
+- **Task Comments**: Comment on tasks 
 - **User Identification**: Track task and comment ownership
 
 ### Technical Highlights
@@ -24,7 +23,7 @@ A full-featured collaborative task management web application built with **ASP.N
 - **Password Security**: BCrypt-style hashing with legacy password support for migrations
 - **Authorization**: ASP.NET Core Identity-based authentication
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Technology | Version | Purpose |
 |-----------|---------|---------|
@@ -62,7 +61,7 @@ TaskManager/
 
 ```
 
-## 🗄️ Database Schema
+## Database Schema
 
 ### Core Tables
 - **Users**: User accounts with credentials
@@ -70,15 +69,12 @@ TaskManager/
 - **Groups**: Collaborative group containers
 - **GroupUser** (GroupMembers): Many-to-many relationship between users and groups
 - **TaskComments**: Nested comments on tasks with parent-child relationships
-- **CommentReactions**: Emoji reactions linked to comments
 
 ### Key Relationships
 - Users → Tasks (one-to-many, optional via Group)
 - Users → Groups (many-to-many via GroupMembers)
 - Groups → Tasks (one-to-many, optional)
 - Users → Comments (one-to-many)
-- Comments → Comments (self-referencing for nesting)
-- Users → Reactions (one-to-many)
 
 ## 🚀 Getting Started
 
@@ -123,7 +119,7 @@ TaskManager/
    
    The app will start at `https://localhost:7000` (or specified port)
 
-## 📝 API Endpoints
+## API Endpoints
 
 ### Authentication
 - **POST** `/auth/login` - User login via username/email and password
@@ -138,10 +134,9 @@ TaskManager/
 - **GET** `/groups` - Group management
 - **GET** `/not-found` - 404 error page
 
-## 🔐 Security Features
+## Security Features
 
 ### Authentication & Authorization
-- **Cookie-based authentication** with 7-day expiration
 - **CSRF protection** via Antiforgery tokens
 - **Password hashing** with BCrypt-style hashing
 - **Legacy password migration** supporting plain-text to hashed conversion
@@ -152,7 +147,7 @@ TaskManager/
 - **Cascading delete rules** for task comments
 - **No Action deletes** for user-referenced data (comments, reactions)
 
-## 🔄 Migrations & Schema Bootstrap
+## Migrations & Schema Bootstrap
 
 The application automatically:
 1. Runs pending Entity Framework migrations on startup
@@ -161,7 +156,7 @@ The application automatically:
 4. Configures foreign key relationships
 5. Migrates legacy passwords on first login
 
-## 🛣️ User Workflows
+## User Workflows
 
 ### Creating a Task
 1. Register/Login to your account
@@ -194,20 +189,7 @@ TaskComment (1) ──→ (M) CommentReaction
 User (1) ──→ (M) CommentReaction
 ```
 
-## 🎯 Future Enhancements
-
-- Task filtering and searching
-- Task priority levels and due dates
-- Real-time notifications
-- Task assignment to group members
-- Drag-and-drop task organization
-- Task templates and recurring tasks
-- Activity logging and audit trails
-- File attachments on tasks
-- Mobile-responsive design improvements
-- Dark mode theme
-
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please:
 1. Fork the repository
@@ -216,22 +198,10 @@ Contributions are welcome! Please:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is part of the "Introduction to Web Programming" course final project.
 
-## 👨‍💻 Author
+## Author
 
-**Khatszian Ali**  
-[GitHub Profile](https://github.com/khatszianAli)
-
-## 📞 Support
-
-For issues, questions, or suggestions:
-- Open a GitHub Issue
-- Contact the project author
-
----
-
-**Last Updated**: May 2026  
-**Project Status**: ✅ Active Development
+**Khantszian Ali**  
